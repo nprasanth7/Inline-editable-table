@@ -1,0 +1,242 @@
+<div class="table-border scrollable-table mat-elevation-z8" fxLayout='column' fxLayout.xs="column" fxFlexFill>
+  <!-- BUTTON -->
+  <div class="button-block" *ngIf="tableConfig.buttonPlacement ==='header'">
+    <ng-container *ngFor="let button of tableConfig.buttonConfig">
+      <div class="{{button.class}}">
+        <button type="button" mat-raised-button *ngIf="button.showButton" [color]="button.color"
+          [disabled]="button.disabled"
+          (click)="button.event.click ? button.click($event, tableConfig.buttonPlacement, moveToback):null"
+          (mouseenter)="button?.event?.mouseenter ? button?.mouseenter($event, tableConfig.buttonPlacement):null">
+          <!-- <img src="/assets/img/{{button.image}}.svg"> -->{{button.label}}
+          <mat-icon *ngIf="button.icon">{{button.icon}}</mat-icon>
+        </button>
+      </div>
+    </ng-container>
+  </div>
+
+  <!-- start mat table -->
+  <!-- Refer Spinner code at the end  -->
+  <mat-table [ngClass]="{'spinner': tableConfig.spinnerConfig.spinner}" [dataSource]="ng6TableData"
+    multiTemplateDataRows matSort matSortDisabled={{!tableConfig.sorting}} (matSortChange)="sortData($event)"
+    matSortDisableClear>
+    <!-- Main container for table -->
+    <ng-container *ngFor="let columnConfigValue of tableConfig.sortedColumnConfig; let index = index"
+      [matColumnDef]="columnConfigValue.colData">
+      <!-- Start - Header Container  -->
+      <ng-container>
+        <mat-header-cell *matHeaderCellDef class="table-header-cell-{{columnConfigValue.className}}"
+          [ngStyle]="{'max-width': columnConfigValue?.style?.width}">
+          <!-- Desktop View -->
+          <span class="column-header" mat-sort-header
+            *ngIf="columnConfigValue.label !=='Select' && columnConfigValue.label !=='SelectWithDropDown' && columnConfigValue.label !=='Expand'"
+            [disabled]="columnConfigValue.sortDisable">
+            {{columnConfigValue.label}} </span>
+          <!-- Mobile View -->
+          <span mat-sort-header *ngIf="columnConfigValue.label ==='Expand' && tableConfig.enableExpand"
+            [disabled]="columnConfigValue.sortDisable">
+            {{columnConfigValue.label}} </span>
+          <!-- Select All Record- Dumb component -->
+          <mat-checkbox class="mat-checkbox" color="primary"
+            *ngIf="columnConfigValue.label ==='Select' && tableConfig.select" #multiSelect type="checkbox"
+            [(ngModel)]="tableConfig.topLevel" [disabled]="disableSelectAll" (change)="topLevelChange()"></mat-checkbox>
+
+          <mat-checkbox [matMenuTriggerFor]="menu" class="mat-checkbox mat-dropdown-checkbox" color="primary"
+            *ngIf="columnConfigValue.label ==='SelectWithDropDown' && tableConfig.selectWithDropDown" #multiSelect
+            type="checkbox" [(ngModel)]="tableConfig.topLevel" [disabled]="disableSelectAll"
+            (click)='onCheckboxWithDropDownClick($event, datum)'>
+            <button mat-icon-button class="arrow-drop-down" [disabled]="disableSelectAll">
+              <mat-icon>arrow_drop_down</mat-icon>
+            </button>
+            <mat-menu #menu="matMenu">
+              <button mat-menu-item *ngFor="let config of tableConfig.selectDropDownConfig"
+                (click)="topLevelChange(config)">
+                <span>{{config.label}}</span>
+              </button>
+            </mat-menu>
+          </mat-checkbox>
+
+        </mat-header-cell>
+      </ng-container>
+
+      <!-- End - Header Container -->
+
+      <!-- Row Container -->
+      <ng-container>
+
+        <mat-cell *matCellDef="let datum;let rowIndex = dataIndex;" [disabled]="datum.isDisabled"
+          [ngClass]="{'enable-error' :datum.errorBlock && datum.errorBlock[columnConfigValue.colData]}"
+          [ngStyle]="{'max-width': columnConfigValue?.style?.width}"
+          class="table-row-cell-{{columnConfigValue.className}}">
+          <!--  start bind checkbox when select enable on config-->
+          <!-- Select Single Record - START -->
+          <mat-checkbox class="mat-checkbox" color="primary"
+            *ngIf="(columnConfigValue.label ==='Select' && tableConfig.select) || (columnConfigValue.label ==='SelectWithDropDown' && tableConfig.selectWithDropDown)"
+            [(ngModel)]="datum.isSelected" [disabled]="datum.isDisabled" (click)='onCheckboxClick($event, datum)'
+            (ngModelChange)='onCheckboxChange(datum)'>
+          </mat-checkbox>
+          <!-- Select Single Record - END -->
+
+          <!-- Mobile View - Expand Collapse Icon - START -->
+          <ng-container
+            *ngIf="columnConfigValue.label ==='Expand' && tableConfig.expandable && tableConfig.enableExpand">
+            <a class="expand-arrows expand-arrow" *ngIf="!datum.detailRow" (click)="expandableRow(datum)">
+              <img src="/assets/img/expand.png">
+            </a>
+            <a class="expand-arrows   collapse-arrow" *ngIf="datum.detailRow" (click)="expandableRow(datum)">
+              <img src="/assets/img/collapse.png">
+            </a>
+          </ng-container>
+          <!-- Mobile View - Expand Collapse Icon - END-->
+
+          <!-- Column Container - START-->
+          <ng-container>
+
+            <!-- Desktop - lable -->
+            <ng-container *ngIf="columnConfigValue.label !=='Select'">
+              <span *ngIf="columnConfigValue.formControl === 'span'" [ngClass]="{'disabled':datum.isDisabled}"
+                class="column-content-span"
+                [matTooltip]="datum[columnConfigValue.colData]?.length>20?datum[columnConfigValue.colData]:''">{{datum[columnConfigValue.colData]}}</span>
+            </ng-container>
+
+            <!-- Component rendering -->
+            <div *ngIf="!datum.editing && columnConfigValue.render"
+              [innerHtml]="columnConfigValue.render(column, datum)"></div>
+
+            <!-- Mobile View - Card's Data -->
+            <ng-container *ngIf="tableConfig.enableExpand && datum.editing">
+              <span *ngIf="columnConfigValue.label !=='Select'">{{datum[columnConfigValue.colData]}}</span>
+            </ng-container>
+
+            <!-- Input on edit -->
+            <ng-container *ngIf="columnConfigValue.formControl === 'input'">
+              <input matInput class="column-content-span form-input" [disabled]="datum.isDisabled"
+                [type]="columnConfigValue?.validate?.type"
+                [placeholder]="datum.isEditable?columnConfigValue?.placeholder:'-'"
+                [value]="datum[columnConfigValue.colData]" [(ngModel)]="datum[columnConfigValue.colData]" customMin="0"
+                customMax="{{columnConfigValue?.validate?.max}}"
+                [ngClass]="{'color-grey': (datum.isEditable), 'color-yellow': (datum.isDirty && datum.isDirty[columnConfigValue.colData]==='valid'), 'color-red': (datum.isDirty && datum.isDirty[columnConfigValue.colData] === 'invalid')}"
+                (keypress)="columnConfigValue.keypress ? columnConfigValue.keypress($event, columnConfigValue?.validate,columnConfigValue.colData, datum):''"
+                (keyup)="columnConfigValue.keyup ? columnConfigValue.keyup($event, columnConfigValue?.validate,columnConfigValue.colData, datum):''"
+                (focus)="columnConfigValue.focus ? columnConfigValue.focus($event, columnConfigValue?.validate,columnConfigValue.colData, datum):''"
+                (blur)="columnConfigValue.blur ? columnConfigValue.blur($event, columnConfigValue?.validate,columnConfigValue.colData, datum):''"
+                [readonly]="!datum.isEditable"
+                [matTooltip]="datum[columnConfigValue.colData]?.length>20?datum[columnConfigValue.colData]:''">
+              <mat-error *ngIf="datum.errorBlock && datum.errorBlock[columnConfigValue.colData]"><span
+                  class="error fs12px">{{datum.errorBlock[columnConfigValue.colData]}}</span></mat-error>
+            </ng-container>
+
+
+            <!-- Single Select - dropdown -->
+            <ng-container *ngIf="columnConfigValue.formControl === 'select'">
+              <mat-select [disabled]="datum.isDisabled" [placeholder]="columnConfigValue?.placeholder"
+                [(ngModel)]="datum[columnConfigValue.colData]"
+                (selectionChange)="columnConfigValue.applySelected && columnConfigValue.applySelected($event, datum)"
+                (mousedown)="columnConfigValue.changeControl && columnConfigValue.changeControl($event,datum)"
+                [ngClass]="{'color-grey': (datum.isEditable), 'color-yellow': (datum.isDirty && datum.isDirty[columnConfigValue.colData] === 'valid'), 'color-red': (datum.isDirty && datum.isDirty[columnConfigValue.colData] ==='invalid')}">
+                <!-- <mat-option>None</mat-option> -->
+                <ng-container *ngFor="let data of columnConfigValue.data">
+                  <mat-option [value]="data[columnConfigValue.config.value]">
+                    <ng-container>
+                      {{data[columnConfigValue.config.label]}}
+                    </ng-container>
+                  </mat-option>
+                </ng-container>
+              </mat-select>
+            </ng-container>
+
+            <ng-container *ngIf="columnConfigValue.formControl === 'customselect'">
+              <mat-select [disabled]="datum.isDisabled" [placeholder]="columnConfigValue?.placeholder"
+                [(ngModel)]="datum[columnConfigValue.colData]"
+                (selectionChange)="columnConfigValue.applySelected($event, datum, scroll.viewPortInfo.startIndex+rowIndex)"
+                (mousedown)="columnConfigValue.changeControl && columnConfigValue.changeControl($event,datum,scroll.viewPortInfo.startIndex+rowIndex)"
+                [ngClass]="{'color-grey': (datum.isEditable), 'color-yellow': (datum.isDirty && datum.isDirty[columnConfigValue.colData] === 'valid'), 'color-red': (datum.isDirty && datum.isDirty[columnConfigValue.colData] ==='invalid')}">
+                <!-- <mat-option>None</mat-option> -->
+                <ng-container *ngFor="let data of columnConfigValue.data[scroll.viewPortInfo.startIndex+rowIndex]">
+                  <mat-option *ngIf="data.canShow" [value]="data[columnConfigValue.config.value]">
+                    <ng-container>
+                      {{data[columnConfigValue.config.label]}}
+                    </ng-container>
+                  </mat-option>
+                </ng-container>
+              </mat-select>
+            </ng-container>
+
+
+            <!-- Multi Select - dropdown -->
+            <ng-container *ngIf="columnConfigValue.formControl === 'multiSelect'">
+              <mat-select [disabled]="datum.isDisabled" placeholder="option" multiple
+                [ngClass]="{'color-grey': (datum.isEditable), 'color-yellow': (datum.isDirty && datum.isDirty[columnConfigValue.colData] === 'valid'), 'color-red': (datum.isDirty && datum.isDirty[columnConfigValue.colData] ==='invalid')}">
+                <mat-option *ngFor="let data of columnConfigValue.data" [value]="data[columnConfigValue.config.value]">
+                  {{data[columnConfigValue.config.label]}}</mat-option>
+              </mat-select>
+            </ng-container>
+          </ng-container>
+
+          <!-- auto complete  -->
+          <ng-container *ngIf="columnConfigValue.formControl === 'autoComplete'">
+            <span style="color:red" *ngIf="columnConfigValue?.mandatory && !datum[columnConfigValue.colData]">*</span>
+            <input type="text" class="column-content-span" [disabled]="datum.isDisabled"
+              [placeholder]="columnConfigValue.placeHolder" aria-label="Number" matInput [matAutocomplete]="auto"
+              [(ngModel)]="datum[columnConfigValue.colData]"
+              [ngClass]="{'color-grey': (datum.isEditable), 'color-yellow': (datum.isDirty && datum.isDirty[columnConfigValue.colData] === 'valid'), 'color-red': (datum.isDirty && datum.isDirty[columnConfigValue.colData] ==='invalid')}"
+              (keyup)="columnConfigValue.searchInput($event, datum);" (focus)="columnConfigValue.changeControl()"
+              (blur)="columnConfigValue.focusOut(datum)" [readonly]="!datum.isEditable"
+              [matTooltip]="datum[columnConfigValue.colData]?.length>20?datum[columnConfigValue.colData]:''">
+            <mat-error *ngIf="datum.errorBlock && datum.errorBlock[columnConfigValue.colData]"><span
+                class="error fs12px">{{datum.errorBlock[columnConfigValue.colData]}}</span></mat-error>
+            <mat-autocomplete autoActiveFirstOption #auto="matAutocomplete"
+              (optionSelected)="columnConfigValue.applySelected($event, datum , index)">
+              <virtual-scroller #scroll [items]="columnConfigValue.data" class="virtual-scroll-auto-complete">
+                <mat-option *ngFor="let option of scroll.viewPortItems"
+                  [value]="option[columnConfigValue.config.label]">
+                  {{option[columnConfigValue.config.label]}}
+                </mat-option>
+              </virtual-scroller>
+            </mat-autocomplete>
+          </ng-container>
+
+          <!-- Column Container - END-->
+        </mat-cell>
+      </ng-container>
+      <!-- Row Container - ENDS -->
+    </ng-container>
+    <!-- Main container for table - ENDS-->
+
+    <mat-header-row #header *matHeaderRowDef="tableConfig.columnsHeaderName; sticky: true"></mat-header-row>
+    <mat-row *matRowDef="let row; columns: tableConfig.columnsHeaderName;" class="example-element-row"
+      (click)="expandedElement = row"></mat-row>
+  </mat-table>
+  <!-- end mat table -->
+  <ng-container *ngIf="tableConfig.notFound">
+    <div class="nodatafound">No data to display</div>
+  </ng-container>
+
+  <!-- start paginator -->
+  <mat-paginator *ngIf="tableConfig.pagination" [length]="tableConfig.pageLength" [pageSize]="tableConfig.pageSize"
+    [pageSizeOptions]="tableConfig.pageSizeOptions"></mat-paginator>
+  <!-- end paginator -->
+
+
+  <!-- SPINNER - Start-->
+  <div class="cat-spinner" fxLayout="row" fxLayoutAlign="center center" *ngIf="tableConfig.spinnerConfig.spinner">
+    <mat-progress-spinner class="example-margin" [color]="tableConfig.spinnerConfig.color"
+      [diameter]="tableConfig.spinnerConfig.diameter" [mode]="tableConfig.spinnerConfig.mode"
+      [value]="tableConfig.spinnerConfig.value">
+    </mat-progress-spinner>{{tableConfig.spinnerConfig.content}}
+  </div>
+  <!-- SPINNER - end-->
+</div>
+
+<!-- BUTTON -->
+<div class="button-block" *ngIf="tableConfig.buttonPlacement ==='footer'">
+  <ng-container *ngFor="let button of tableConfig.buttonConfig">
+    <div class=" {{button.class}}">
+      <button type=" button" mat-raised-button [color]="button.color" *ngIf="button.showButton"
+        [disabled]="button.disabled"
+        (click)="button.event.click ? button.click($event, tableConfig.buttonPlacement, moveToback):null"
+        (mouseenter)="button?.event?.mouseenter ? button?.mouseenter($event, tableConfig.buttonPlacement, moveToback):null">
+        <!-- <img src="/assets/img/{{button.image}}.svg"> -->{{button.label}}
+      </button>
+    </div>
+  </ng-container>
+</div>
